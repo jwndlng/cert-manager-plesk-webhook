@@ -1,0 +1,24 @@
+name: Application checks
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update rust toolchain
+        run: |
+          rustup update
+          rustup component add clippy
+          rustup install nightly
+      - name: Run lint
+        run: |
+          cargo clippy
+      - name: Run tezts
+        run: |
+          cargo test
