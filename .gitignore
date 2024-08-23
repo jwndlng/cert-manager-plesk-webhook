@@ -23,3 +23,12 @@ Cargo.lock
 # Added by cargo
 
 /target
+
+# Environment variable file
+.env
+.env.test
+.envrc
+
+# Custom
+.vscode/
+settings.toml

@@ -7,7 +7,6 @@
 ## Features
 
 - **DNS-01 Challenge Support**: Automatically create and delete DNS records in Plesk to complete the DNS-01 challenge for Let's Encrypt certificates.
-- **Token Authentication**: Secure communication between cert-manager and the webhook server using authentication tokens to restrict access.
 
 ## Prerequisites
 
@@ -19,29 +18,7 @@
 Update the ClusterIssuer or Issuer configuration in cert-manager to use this webhook:
 
 ```yaml
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-dns-01
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: your-email@example.com
-    privateKeySecretRef:
-      name: letsencrypt-private-key
-    solvers:
-    - dns01:
-        webhook:
-          groupName: acme.your-domain.com
-          solverName: plesk
-          config:
-            apiUrl: "https://plesk.example.com:8443"
-            apiKeySecretRef:
-              name: plesk-api-key
-              key: api-key
-            bearerTokenSecretRef:
-              name: webhook-secrets
-              key: bearer-token
+TBD
 ```
 
 ## Contributing

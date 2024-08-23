@@ -1,6 +1,18 @@
 [package]
-name = "cert-manager-plex-webhook"
+name = "cert-manager-plesk-webhook"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.86"
+config = "0.14.0"
+dotenv = "0.15.0"
+reqwest = { version = "0.12.7", features = ["json", "blocking"] }
+serde = "1.0.208"
+serde_json = "1.0.125"
+serde-xml-rs = "0.6.0"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+rcgen = "0.13.1"
+warp = { version = "0.3.7", features = ["tls"] }
