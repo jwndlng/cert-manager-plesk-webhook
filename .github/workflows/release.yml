@@ -3,6 +3,7 @@ name: Application release
 permissions:
   id-token: write
   attestations: write
+  packages: write
   contents: write
 
 on:
@@ -37,9 +38,28 @@ jobs:
         with:
           subject-path: target/release/${{ env.APPLICATION_NAME}}
 
-      - name: Build docker container
-        run: |
-          docker build -f Dockerfile -t ${{ env.APPLICATION_NAME }}:${{ github.ref_name }} .
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image
+        id: push
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          load: true
+          file: Dockerfile
+          tags: ${{ env.APPLICATION_NAME }}:${{ github.ref_name }}
+
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ghcr.io/${{ env.APPLICATION_NAME}}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 
       - name: Create release
         env:

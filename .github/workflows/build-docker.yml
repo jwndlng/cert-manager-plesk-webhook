@@ -1,9 +1,17 @@
 ---
 name: Build docker image
+
 on:
   push:
     branches:
       - main
+
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
 jobs:
   security_scanning:
     runs-on: ubuntu-latest
@@ -15,7 +23,7 @@ jobs:
       - name: Build (but not push) Docker image
         uses: docker/build-push-action@v3
         with:
-          push: true
+          push: false
           load: true
           file: Dockerfile
           tags: cert-manager-plesk-webhook:latest
@@ -30,6 +38,26 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Docker build
-        run: |
-          docker build -f Dockerfile -t cert-manager-plesk-webhook:latest .
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image
+        id: push
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          load: true
+          file: Dockerfile
+          tags: cert-manager-plesk-webhook:latest
+
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ghcr.io/${{ env.APPLICATION_NAME}}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
