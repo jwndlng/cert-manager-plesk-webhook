@@ -1,0 +1,56 @@
+name: Application release
+
+permissions:
+  id-token: write
+  attestations: write
+  contents: write
+
+on:
+  push:
+    tags:
+      - v*
+
+env:
+  APPLICATION_NAME: cert-manager-plesk-webhook
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update rust toolchain
+        run: |
+          rustup update
+
+      - name: Build
+        run: |
+          cargo build --release
+
+      - name: Generate Checksums
+        run: |
+          sha256sum target/release/${{ env.APPLICATION_NAME}} > sha256sum.txt
+          md5sum target/release/${{ env.APPLICATION_NAME}} > md5sum.txt
+
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: target/release/${{ env.APPLICATION_NAME}}
+
+      - name: Build docker container
+        run: |
+          docker build -f Dockerfile -t ${{ env.APPLICATION_NAME }}:${{ github.ref_name }} .
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo="$GITHUB_REPOSITORY" \
+            --title="${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag \
+            --notes "Docker Image:\n\n\`\`\`\nDocker pull ${{ env.APPLICATION_NAME }}:${{ github.ref_name }}\nDocker pull ${{ env.APPLICATION_NAME }}:latest\n\`\`\`" \
+            target/release/${{ env.APPLICATION_NAME }} \
+            sha256sum.txt \
+            md5sum.txt

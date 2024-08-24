@@ -1,0 +1,35 @@
+---
+name: Build docker image
+on:
+  push:
+    branches:
+      - main
+jobs:
+  security_scanning:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build (but not push) Docker image
+        uses: docker/build-push-action@v3
+        with:
+          push: false
+          load: true
+          file: Dockerfile
+          tags: cert-manager-plesk-webhook:latest
+      - name: Aqua Security Trivy
+        uses: aquasecurity/trivy-action@0.9.2
+        with:
+          image-ref: cert-manager-plesk-webhook:latest
+  build_docker_image:
+    name: Build docker image
+    needs: security_scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Docker build
+        run: |
+          docker build -f Dockerfile -t cert-manager-plesk-webhook:latest .
