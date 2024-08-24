@@ -15,7 +15,7 @@ jobs:
       - name: Build (but not push) Docker image
         uses: docker/build-push-action@v3
         with:
-          push: false
+          push: true
           load: true
           file: Dockerfile
           tags: cert-manager-plesk-webhook:latest
