@@ -13,6 +13,7 @@ on:
 
 env:
   APPLICATION_NAME: cert-manager-plesk-webhook
+  DOCKER_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/cert-manager-plesk-webhook
 
 jobs:
   release:
@@ -52,12 +53,12 @@ jobs:
           push: true
           load: true
           file: Dockerfile
-          tags: ${{ env.APPLICATION_NAME }}:${{ github.ref_name }}
+          tags: ${{ env.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}
 
       - name: Attest Build Provenance
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ghcr.io/${{ env.APPLICATION_NAME}}
+          subject-name: ${{ env.DOCKER_IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
