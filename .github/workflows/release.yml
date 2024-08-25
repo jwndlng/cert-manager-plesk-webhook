@@ -7,9 +7,8 @@ permissions:
   contents: write
 
 on:
-  push:
-    tags:
-      - v*
+  release:
+    types: [published]
 
 env:
   APPLICATION_NAME: cert-manager-plesk-webhook
@@ -62,16 +61,18 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
-      - name: Create release
+      - name: Upload assets to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release edit "$GITHUB_REF_NAME" \
-            --repo="$GITHUB_REPOSITORY" \
-            --title="${GITHUB_REF_NAME}" \
-            --generate-notes \
-            --verify-tag \
-            --notes "Docker Image:\n\n\`\`\`\nDocker pull ${{ env.APPLICATION_NAME }}:${{ github.ref_name }}\nDocker pull ${{ env.APPLICATION_NAME }}:latest\n\`\`\`" \
+          gh release upload "${{ github.ref }}" \
             target/release/${{ env.APPLICATION_NAME }} \
             sha256sum.txt \
             md5sum.txt
+
+      - name: Update release with Docker information
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ github.ref }}" \
+            --notes "Docker Image:\n\n\`\`\`\nDocker pull ${{ env.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}\nDocker pull ${{ env.DOCKER_IMAGE_NAME }}:latest\n\`\`\`"
