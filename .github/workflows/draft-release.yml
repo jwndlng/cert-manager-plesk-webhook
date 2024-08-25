@@ -14,4 +14,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          config-name: .github/config/draft-release-config.yml
+          config-name: config/draft-release-config.yml
