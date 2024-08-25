@@ -74,5 +74,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release edit "${{ github.ref }}" \
+          gh release edit "${{ github.ref_name }}" \
             --notes "Docker Image:\n\n\`\`\`\nDocker pull ${{ env.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}\nDocker pull ${{ env.DOCKER_IMAGE_NAME }}:latest\n\`\`\`"
