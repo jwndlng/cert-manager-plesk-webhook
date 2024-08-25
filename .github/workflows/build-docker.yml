@@ -37,7 +37,7 @@ jobs:
           file: Dockerfile
           tags: ${{ env.APPLICATION_NAME}}:latest
       - name: Aqua Security Trivy
-        uses: aquasecurity/trivy-action@0.9.2
+        uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.APPLICATION_NAME}}:latest
   build_docker_image:
@@ -57,7 +57,7 @@ jobs:
 
       - name: Build Docker image
         id: push
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         with:
           push: true
           load: true
