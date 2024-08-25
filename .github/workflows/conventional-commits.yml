@@ -11,6 +11,8 @@ jobs:
   check:
     name: conventional-pr-title:required
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
         # Conventional commit patterns:
         #   verb: description
