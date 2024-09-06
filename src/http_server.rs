@@ -61,7 +61,15 @@ impl HttpServer {
         });
 
         // Combine the routes
-        let routes = present_route.or(cleanup_route);
+        let routes = present_route.or(cleanup_route)
+            .with(warp::log::custom(|info| {
+                tracing::info!(
+                    "Request: {} {} from {}",
+                    info.method(),
+                    info.path(),
+                    info.remote_addr().map(|addr| addr.to_string()).unwrap_or_else(|| "unknown".to_string())
+                );
+            }));
 
         // Start the warp server
         warp::serve(routes).run(([0, 0, 0, 0], 8080)).await;
