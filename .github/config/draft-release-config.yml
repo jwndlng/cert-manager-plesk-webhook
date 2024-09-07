@@ -2,13 +2,13 @@ name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 categories:
   - title: '🚀 Features'
-    labels: ['feat', 'enchancement']
+    labels: ['feat', 'enchancement', 'feature']
   - title: '🐛 Bug Fixes'
     labels: ['fix', 'bug', 'bugfix']
   - title: '🛠 Maintenance'
     labels: ['chore', 'refactor', 'style', 'perf', 'test', 'ci', 'docs']
   - title: '📚 Documentation'
-    labels: ['docs']
+    labels: ['docs', 'doc', 'documentation']
 change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 change-title-escapes: '\<*_&'
 version-resolver:
@@ -23,6 +23,6 @@ version-resolver:
       - 'patch'
   default: patch
 template: |
-  ## Changes
+  # What's Changed
 
   $CHANGES
