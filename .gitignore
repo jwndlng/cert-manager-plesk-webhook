@@ -32,3 +32,4 @@ Cargo.lock
 # Custom
 .vscode/
 settings.toml
+release-notes.txt
