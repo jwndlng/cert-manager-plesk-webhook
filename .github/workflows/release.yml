@@ -77,11 +77,14 @@ jobs:
           gh release view "${{ github.ref_name }}" --json body -q '.body' > release-notes.txt
           echo "" >> release-notes.txt
           echo "# Docker Image" >> release-notes.txt
+          echo "" >> release-notes.txt
           echo "## Version: ${{ github.ref_name }}" >> release-notes.txt
+          echo "" >> release-notes.txt
           echo "```" >> release-notes.txt
           echo "docker pull ${{ env.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}" >> release-notes.txt
           echo "```" >> release-notes.txt
           echo "## Latest" >> release-notes.txt
+          echo "" >> release-notes.txt
           echo "```" >> release-notes.txt
           echo "docker pull ${{ env.DOCKER_IMAGE_NAME }}:latest" >> release-notes.txt
           echo "```" >> release-notes.txt
