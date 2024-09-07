@@ -65,7 +65,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref }}" \
+          gh release upload "${{ github.ref_name }}" \
             target/release/${{ env.APPLICATION_NAME }} \
             sha256sum.txt \
             md5sum.txt
