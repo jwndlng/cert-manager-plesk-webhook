@@ -3,6 +3,8 @@ use warp::Filter;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
+use rcgen::generate_simple_self_signed;
+use tokio::task;
 use crate::plesk_api::PleskAPI;
 use crate::settings::Settings;
 
@@ -71,8 +73,39 @@ impl HttpServer {
                 );
             }));
 
-        // Start the warp server
-        warp::serve(routes).run(([0, 0, 0, 0], 8080)).await;
+        // SAN; todo make this configurable
+        let subject_alt_names = vec!["localhost".into()];
+        // Generate an in-memory self-signed certificate
+        let cert_key = generate_simple_self_signed(subject_alt_names)?;
+
+        // Serialize the certificate and the private key to PEM format
+        let priv_key_pem = cert_key.key_pair.serialize_pem();
+        let cert_pem = cert_key.cert.pem();
+
+
+        // Clone the routes for both HTTP and HTTPS
+        let routes_http = routes.clone();
+        let routes_https = routes;
+
+        // Serve non-TLS on port 8000
+        let http_server = task::spawn(async move {
+            warp::serve(routes_http)
+                .run(([0, 0, 0, 0], 8080))
+                .await;
+        });
+
+        // Serve TLS on port 443
+        let https_server = task::spawn(async move {
+            warp::serve(routes_https)
+                .tls()
+                .key(priv_key_pem.as_bytes())
+                .cert(cert_pem.as_bytes())
+                .run(([0, 0, 0, 0], 8443))
+                .await;
+        });
+
+        // Run both servers concurrently
+        tokio::try_join!(http_server, https_server)?;
 
         Ok(())
     }   
