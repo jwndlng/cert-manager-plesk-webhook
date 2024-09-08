@@ -115,10 +115,11 @@ impl HttpServer {
         let routes = present_route.or(cleanup_route).or(solver_route)
             .with(warp::log::custom(|info| {
                 tracing::info!(
-                    "Request: {} {} from {}",
+                    "Request: {} {} from {}. Status: {}",
                     info.method(),
                     info.path(),
-                    info.remote_addr().map(|addr| addr.to_string()).unwrap_or_else(|| "unknown".to_string())
+                    info.remote_addr().map(|addr| addr.to_string()).unwrap_or_else(|| "unknown".to_string()),
+                    info.status().as_u16()
                 );
             }));
 
