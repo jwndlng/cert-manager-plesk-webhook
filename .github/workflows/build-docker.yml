@@ -50,6 +50,7 @@ jobs:
           tags: ${{ env.DOCKER_IMAGE_NAME }}:${{ vars.DOCKER_IMAGE_VERSION }}
 
       - name: Attest Build Provenance
+        continue-on-error: true
         uses: actions/attest-build-provenance@v1
         with:
           subject-name: ${{ env.DOCKER_IMAGE_NAME }}
