@@ -57,8 +57,14 @@ impl HttpServer {
         let plesk_api_clone_cleanup = self.plesk_api.clone();
         let plesk_api_clone_present = self.plesk_api.clone();
         let solver_name = self.solver_name.clone();
-        
-        let present_route = warp::path("present")
+
+        // Base path called /apis/<group_name>/<solver_version> by cert-manager
+        let url_base_path = warp::path("apis")
+            .and(warp::path(self.group_name.clone()))
+            .and(warp::path(self.solver_version.clone()));
+
+        let present_route = url_base_path.clone()
+        .and(warp::path("present"))
         .and(warp::post())
         .and(warp::body::json())
         .and_then(move |body| {
@@ -66,7 +72,8 @@ impl HttpServer {
             handle_present(body, plesk_api)
         });
 
-        let cleanup_route = warp::path("cleanup")
+        let cleanup_route = url_base_path.clone()
+            .and(warp::path("cleanup"))
             .and(warp::post())
             .and(warp::body::json())
             .and_then(move |body| {
@@ -74,9 +81,7 @@ impl HttpServer {
                 handle_cleanup(body, plesk_api)
         });
 
-        let solver_route = warp::path("apis")
-            .and(warp::path(self.group_name.clone()))
-            .and(warp::path(self.solver_version.clone()))
+        let solver_route = url_base_path.clone()
             .and(warp::get())
             .and_then(move || {
                 handle_solver(solver_name.clone())
@@ -181,6 +186,7 @@ async fn handle_cleanup(body: DnsRemovalRequest, plesk_api: Arc<PleskAPI>) -> Re
 }
 
 async fn handle_solver(solver_name: String) -> Result<impl warp::Reply, warp::Rejection> {
+    info!("Received /apis request for Solver: {}", solver_name);
     Ok(warp::reply::json(&SolverResponse {
         solver: solver_name,
     }))
