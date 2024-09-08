@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tracing::info;
 use rcgen::generate_simple_self_signed;
 use tokio::task;
+use serde_json::Value;
 use crate::plesk_api::PleskAPI;
 use crate::settings::Settings;
 
@@ -24,10 +25,32 @@ struct DnsResponse {
     pub record_id: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct ChallengeRequest {
+    uid: String,
+    action: String,
+    type_: String,
+    dns_name: String,
+    key: String,
+    resolved_fqdn: String,
+    resolved_zone: String,
+    resource_namespace: String,
+    allow_ambient_credentials: bool,
+    config: Option<Value>,
+}
+
 #[derive(Debug, Serialize)]
-struct SolverResponse {
-    pub name: String,
-    pub success: String
+struct ChallengeResponse {
+    uid: String,
+    success: bool,
+    status: Option<ErrorResponse>,
+}
+
+#[derive(Debug, Serialize)]
+struct ErrorResponse {
+    message: String,
+    reason: String,
+    code: i32,
 }
 
 pub struct HttpServer {
@@ -188,8 +211,9 @@ async fn handle_cleanup(body: DnsRemovalRequest, plesk_api: Arc<PleskAPI>) -> Re
 
 async fn handle_solver(solver_name: String) -> Result<impl warp::Reply, warp::Rejection> {
     info!("Received /apis request for Solver: {}", solver_name);
-    Ok(warp::reply::json(&SolverResponse {
-        name: solver_name,
-        status: "success".to_string(),
+    Ok(warp::reply::json(&ChallengeResponse {
+        uid: "1".to_string(),
+        success: true,
+        status: None,
     }))
 }
