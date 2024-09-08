@@ -10,7 +10,7 @@ on:
     paths:
       - 'Dockerfile'
       - 'src/**'
-      - 'workflows/build-docker.yml'
+      - '.github/workflows/build-docker.yml'
       - 'Cargo.toml'
       - 'Cargo.lock'
 
