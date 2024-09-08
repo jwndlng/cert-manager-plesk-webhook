@@ -24,8 +24,16 @@ struct DnsResponse {
     pub record_id: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+struct SolverResponse {
+    pub solver: String
+}
+
 pub struct HttpServer {
     plesk_api: Arc<PleskAPI>,
+    group_name: String,
+    solver_name: String,
+    solver_version: String,
 }
 
 impl HttpServer {
@@ -38,6 +46,9 @@ impl HttpServer {
         );
         HttpServer {
             plesk_api: Arc::new(plesk_api),
+            group_name: settings.common.groupname.clone(),
+            solver_name: settings.common.solvername.clone(),
+            solver_version: settings.common.solverversion.clone()
         }
     }
 
@@ -45,6 +56,7 @@ impl HttpServer {
 
         let plesk_api_clone_cleanup = self.plesk_api.clone();
         let plesk_api_clone_present = self.plesk_api.clone();
+        let solver_name = self.solver_name.clone();
         
         let present_route = warp::path("present")
         .and(warp::post())
@@ -62,8 +74,16 @@ impl HttpServer {
                 handle_cleanup(body, plesk_api)
         });
 
+        let solver_route = warp::path("apis")
+            .and(warp::path(self.group_name.clone()))
+            .and(warp::path(self.solver_version.clone()))
+            .and(warp::get())
+            .and_then(move || {
+                handle_solver(solver_name.clone())
+            });
+
         // Combine the routes
-        let routes = present_route.or(cleanup_route)
+        let routes = present_route.or(cleanup_route).or(solver_route)
             .with(warp::log::custom(|info| {
                 tracing::info!(
                     "Request: {} {} from {}",
@@ -74,7 +94,10 @@ impl HttpServer {
             }));
 
         // SAN; todo make this configurable
-        let subject_alt_names = vec!["localhost".into()];
+        let subject_alt_names = vec![
+            "localhost".into(),
+            format!("{}.cert-manager.svc.cluster.local", self.solver_name),
+        ];
         // Generate an in-memory self-signed certificate
         let cert_key = generate_simple_self_signed(subject_alt_names)?;
 
@@ -155,4 +178,10 @@ async fn handle_cleanup(body: DnsRemovalRequest, plesk_api: Arc<PleskAPI>) -> Re
         record_id: None,
     };
     Ok(warp::reply::json(&response))
+}
+
+async fn handle_solver(solver_name: String) -> Result<impl warp::Reply, warp::Rejection> {
+    Ok(warp::reply::json(&SolverResponse {
+        solver: solver_name,
+    }))
 }
