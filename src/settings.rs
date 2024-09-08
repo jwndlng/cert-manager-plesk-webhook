@@ -4,7 +4,9 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 pub struct CommonSettings {
-    pub token: String,
+    pub groupname: String,
+    pub solvername: String,
+    pub solverversion: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
