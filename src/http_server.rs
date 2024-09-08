@@ -26,7 +26,8 @@ struct DnsResponse {
 
 #[derive(Debug, Serialize)]
 struct SolverResponse {
-    pub solver: String
+    pub name: String,
+    pub success: String
 }
 
 pub struct HttpServer {
@@ -188,6 +189,7 @@ async fn handle_cleanup(body: DnsRemovalRequest, plesk_api: Arc<PleskAPI>) -> Re
 async fn handle_solver(solver_name: String) -> Result<impl warp::Reply, warp::Rejection> {
     info!("Received /apis request for Solver: {}", solver_name);
     Ok(warp::reply::json(&SolverResponse {
-        solver: solver_name,
+        name: solver_name,
+        status: "success".to_string(),
     }))
 }
