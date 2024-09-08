@@ -57,6 +57,7 @@ jobs:
           push-to-registry: true
 
       - name: Aqua Security Trivy
+        if: github.ref_name == 'main'
         uses: aquasecurity/trivy-action@0.24.0
         with:
-          image-ref: ${{ env.APPLICATION_NAME}}:latest
+          image-ref: ${{ env.APPLICATION_NAME}}:${{ vars.DOCKER_IMAGE_VERSION }}
