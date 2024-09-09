@@ -188,8 +188,11 @@ async fn handle_post(
 
     let mut uid = "1".to_string();
     if body.uid.is_some() {
-        uid = body.uid.unwrap();
-        info!("UID {} found in request.", &uid);
+        let body_uid = body.uid.unwrap();
+        if &body_uid != "" {
+            uid = body_uid;
+            info!("UID {} found in request.", &uid);
+        }
     }
 
     let challenge_id = body.key;
