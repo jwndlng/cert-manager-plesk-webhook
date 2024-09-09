@@ -1,4 +1,5 @@
 use anyhow::{Error, anyhow};
+use warp::filters::body;
 use warp::Filter;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -162,18 +163,14 @@ impl HttpServer {
 
 // Handler for the /cleanup endpoint
 async fn handle_post(
-    body: ChallengeRequest,
+    body: Value,
     plesk_api: Arc<PleskAPI>,
     cache: Arc<Mutex<HashMap<String, String>>>
 ) -> Result<impl warp::Reply, warp::Rejection> {
     
-    // TODO
+    info!("Received POST request with the following payload: {:?}", &body);
 
-    // Extract UID and store it in the cache together with the challenge code and PLESK ID
-    // Remove cache on successful cleanup
-    // We need to handle if cache is still set but there is a new UID
-    // This function needs to be robust and handle multiple requests at the same time or subsequent requests
-    debug!("Received POST request with the following payload: {:?}", &body);
+    let body: ChallengeRequest = serde_json::from_value(body).unwrap();
 
     let challenge_id = body.key;
     let uid = body.uid;
