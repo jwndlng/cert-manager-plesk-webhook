@@ -39,7 +39,7 @@ struct ChallengeRequest {
 
 #[derive(Debug, Deserialize)]
 struct ChallengeBody {
-    uid: String,
+    uid: Option<String>,
     action: String,
     type_: String,
     dns_name: String,
@@ -180,8 +180,20 @@ async fn handle_post(
     let request: ChallengeRequest = serde_json::from_value(body).unwrap();
     let body = request.request;
 
+    if body.uid.is_none() {
+        return Ok(warp::reply::json(&ChallengeResponse {
+            uid: body.uid.unwrap_or_else(|| "0".to_string()),
+            success: true,
+            status: Some(ErrorResponse {
+                message: "No UID provided".to_string(),
+                reason: "No UID provided".to_string(),
+                code: 400,
+            }),
+        }));
+    }
+
     let challenge_id = body.key;
-    let uid = body.uid;
+    let uid = body.uid.unwrap();
     let action = body.action;
 
     let mut cache = cache.lock().await;
