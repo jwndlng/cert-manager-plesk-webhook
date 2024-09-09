@@ -41,12 +41,18 @@ struct ChallengeRequest {
 struct ChallengeBody {
     uid: Option<String>,
     action: String,
+    #[serde(rename = "type")]
     type_: String,
+    #[serde(rename = "dnsName")]
     dns_name: String,
     key: String,
+    #[serde(rename = "resolvedFQDN")]
     resolved_fqdn: String,
+    #[serde(rename = "resolvedZone")]
     resolved_zone: String,
+    #[serde(rename = "resourceNamespace")]
     resource_namespace: String,
+    #[serde(rename = "allowAmbientCredentials")]
     allow_ambient_credentials: bool,
     config: Option<Value>,
 }
