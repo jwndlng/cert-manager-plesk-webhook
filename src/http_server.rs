@@ -92,6 +92,7 @@ impl HttpServer {
             .and(warp::path(self.solver_version.clone()));
 
         let post_route = url_base_path.clone()
+        .and(warp::path(self.solver_name.clone()))
         .and(warp::post())
         .and(warp::body::json())
         .and_then(move |body| {
