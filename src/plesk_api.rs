@@ -118,7 +118,7 @@ impl PleskAPI {
     }
 
 
-    pub async fn remove_challenge(&self, record_id: String) -> Result<(), Error> {
+    pub async fn remove_challenge(&self, record_id: String) -> Result<String, Error> {
         let response = self
             .create_request()
             .body(format!(
@@ -159,7 +159,7 @@ impl PleskAPI {
                 );
                 return Err(anyhow!(error));
             }
-            return Ok(());
+            return Ok(record_id);
         }
 
         let error = io::Error::new(
