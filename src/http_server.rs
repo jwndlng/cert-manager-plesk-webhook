@@ -186,20 +186,13 @@ async fn handle_post(
     let request: ChallengeRequest = serde_json::from_value(body).unwrap();
     let body = request.request;
 
-    if body.uid.is_none() {
-        return Ok(warp::reply::json(&ChallengeResponse {
-            uid: body.uid.unwrap_or_else(|| "0".to_string()),
-            success: true,
-            status: Some(ErrorResponse {
-                message: "No UID provided".to_string(),
-                reason: "No UID provided".to_string(),
-                code: 400,
-            }),
-        }));
+    let mut uid = "1".to_string();
+    if body.uid.is_some() {
+        uid = body.uid.unwrap();
+        info!("UID {} found in request.", &uid);
     }
 
     let challenge_id = body.key;
-    let uid = body.uid.unwrap();
     let action = body.action;
 
     let mut cache = cache.lock().await;
