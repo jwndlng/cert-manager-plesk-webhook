@@ -12,8 +12,8 @@ use crate::plesk_api::PleskAPI;
 use crate::settings::Settings;
 
 // Define constants for actions
-const ACTION_PRESENT: &str = "present";
-const ACTION_CLEANUP: &str = "cleanup";
+const ACTION_PRESENT: &str = "Present";
+const ACTION_CLEANUP: &str = "CleanUp";
 
 #[derive(Debug, Deserialize)]
 struct DnsAddRequest {
@@ -30,8 +30,15 @@ struct DnsResponse {
     pub record_id: Option<String>,
 }
 
+
+
 #[derive(Debug, Deserialize)]
 struct ChallengeRequest {
+    request: ChallengeBody
+}
+
+#[derive(Debug, Deserialize)]
+struct ChallengeBody {
     uid: String,
     action: String,
     type_: String,
@@ -170,7 +177,8 @@ async fn handle_post(
     
     info!("Received POST request with the following payload: {:?}", &body);
 
-    let body: ChallengeRequest = serde_json::from_value(body).unwrap();
+    let request: ChallengeRequest = serde_json::from_value(body).unwrap();
+    let body = request.request;
 
     let challenge_id = body.key;
     let uid = body.uid;
