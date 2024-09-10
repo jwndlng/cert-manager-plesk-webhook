@@ -2,6 +2,7 @@ use anyhow::{Error, anyhow};
 use std::io;
 use reqwest::{Client, RequestBuilder};
 use serde::{Deserialize, Serialize};
+use tracing::info;
 use serde_xml_rs::from_str;
 
 const PLESK_API_PATH: &str = "/enterprise/control/agent.php";
@@ -18,26 +19,44 @@ pub struct PleskAPI {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct PleskDNSResponse {
-    dns: PleskDNSResponseAction,
+    dns: PleskDNSResponseDNS,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct PleskDNSResponseDNS {
+    add_rec: Option<PleskDNSResponseAction>,
+    del_rec: Option<PleskDNSResponseAction>,
+    get_rec: Option<PleskDNSResponseActions>
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct PleskDNSResponseAction {
-    add_rec: Option<PleskDNSResponseResult>,
-    del_rec: Option<PleskDNSResponseResult>,
+    result: PleskDNSResponseResult,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct PleskDNSResponseActions {
+    result: Vec<PleskDNSResponseResult>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct PleskDNSResponseResult {
-    result: PleskDNSResponseData,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct PleskDNSResponseData {
     status: String,
     errcode: Option<String>,
     errtext: Option<String>,
     id: Option<String>,
+    data: Option<PleskDNSResponseData>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct PleskDNSResponseData {
+    #[serde(rename = "site-id")]
+    pub site_id: String,
+    #[serde(rename = "type")]
+    pub record_type: String,
+    pub host: String,
+    pub value: String,
+    pub opt: Option<String>,
 }
 
 impl PleskAPI {
@@ -99,7 +118,11 @@ impl PleskAPI {
         if let Some(dns_resp_record) = dns_response.dns.add_rec {
             if dns_resp_record.result.status == "error" {
                 let error_msg = dns_resp_record.result.errtext.unwrap();
-                if !error_msg.contains("exists") {
+                if error_msg.contains("exists") {
+                    info!("Record already exists, retrieving record ID");
+                    let record_id = self.get_challenge_record_id().await?;
+                    return Ok(record_id);
+                } else {
                     let error = io::Error::new(
                         io::ErrorKind::Other,
                         format!(
@@ -170,6 +193,52 @@ impl PleskAPI {
             format!("Response could not be parsed: {}", response_text),
         );
         Err(anyhow!(error))
+    }
+
+    pub async fn get_challenge_record_id(&self) -> Result<String, Error> {
+        info!("Getting challenge record ID");
+        let response = self
+            .create_request()
+            .body(format!(
+                r#"
+                    <packet>
+                        <dns>
+                            <get_rec>
+                                <filter>
+                                    <site-id>{}</site-id>
+                                </filter>
+                            </get_rec>
+                        </dns>
+                    </packet>
+                "#,
+                self.site_id
+                )
+            )
+            .send()
+            .await?;
+
+        let response_text = response.text().await?;
+        let dns_response: PleskDNSResponse = match from_str(&response_text) {
+            Ok(response) => response,
+            Err(e) => {
+                return Err(anyhow!(e));
+            }
+        };
+
+        if let Some(dns_resp_record) = dns_response.dns.get_rec {
+            let actions = dns_resp_record.result;
+            for action in actions {
+                if action.data.is_none() {
+                    continue;
+                }
+                let record_data = action.data.unwrap();
+                if record_data.host.contains(ACME_CHALLENGE_PREFIX) {
+                    info!("Found record ID: {}", action.id.clone().unwrap());
+                    return Ok(action.id.unwrap());
+                }
+            }
+        }
+        Err(anyhow!("No record found"))
     }
 
 }
