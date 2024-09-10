@@ -34,11 +34,11 @@ struct DnsResponse {
 
 #[derive(Debug, Deserialize)]
 struct ChallengeRequest {
-    request: ChallengeBody
+    request: ChallengeRequestBody
 }
 
 #[derive(Debug, Deserialize)]
-struct ChallengeBody {
+struct ChallengeRequestBody {
     uid: Option<String>,
     action: String,
     #[serde(rename = "type")]
@@ -59,6 +59,11 @@ struct ChallengeBody {
 
 #[derive(Debug, Serialize)]
 struct ChallengeResponse {
+    reponse: ChallengeResponseBody
+}
+
+#[derive(Debug, Serialize)]
+struct ChallengeResponseBody {
     uid: String,
     success: bool,
     status: Option<ErrorResponse>,
@@ -184,6 +189,7 @@ async fn handle_post(
     info!("Received POST request with the following payload: {:?}", &body);
 
     let request: ChallengeRequest = serde_json::from_value(body).unwrap();
+
     let body = request.request;
 
     let mut uid = "1".to_string();
@@ -195,6 +201,11 @@ async fn handle_post(
         }
     }
 
+    let mut response_body = ChallengeResponseBody {
+        uid: uid.clone(),
+        success: false,
+        status: None,
+    };
     let challenge_id = body.key;
     let action = body.action;
 
@@ -203,9 +214,7 @@ async fn handle_post(
     if !cache.contains_key(&uid) && action == ACTION_CLEANUP {
         info!("Record ID not found in cache, returning no success");
         return Ok(warp::reply::json(&ChallengeResponse {
-            uid: uid,
-            success: false,
-            status: None,
+            reponse: response_body
         }));
     }
 
@@ -227,9 +236,7 @@ async fn handle_post(
 
     if result.is_err() {
         return Ok(warp::reply::json(&ChallengeResponse {
-            uid: uid,
-            success: false,
-            status: None,
+            reponse: response_body,
         }));
     }
 
@@ -238,17 +245,22 @@ async fn handle_post(
         cache.remove(&uid);
     }
 
+    response_body.success = true;
     Ok(warp::reply::json(&ChallengeResponse {
-        uid: uid,
-        success: true,
-        status: None,
+        reponse: response_body,
     }))
 }
 
 async fn handle_get() -> Result<impl warp::Reply, warp::Rejection> {
     Ok(warp::reply::json(&ChallengeResponse {
-        uid: "1".to_string(),
-        success: true,
-        status: None,
+        reponse: ChallengeResponseBody {
+            uid: "1".to_string(),
+            success: false,
+            status: Some(ErrorResponse {
+                message: "Not implemented".to_string(),
+                reason: "Not implemented".to_string(),
+                code: 501,
+            }),
+        }
     }))
 }
