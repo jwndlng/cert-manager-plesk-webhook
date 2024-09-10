@@ -220,6 +220,7 @@ async fn handle_post(
     };
 
     if result.is_err() {
+        info!("Error: {:?}", result.err());
         return Ok(warp::reply::json(&ChallengeResponse {
             reponse: response_body,
         }));
