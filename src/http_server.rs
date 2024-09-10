@@ -16,23 +16,6 @@ const ACTION_PRESENT: &str = "Present";
 const ACTION_CLEANUP: &str = "CleanUp";
 
 #[derive(Debug, Deserialize)]
-struct DnsAddRequest {
-    pub value: String,
-}
-#[derive(Debug, Deserialize)]
-struct DnsRemovalRequest {
-    pub record_id: String,
-}
-
-#[derive(Debug, Serialize)]
-struct DnsResponse {
-    pub status: String,
-    pub record_id: Option<String>,
-}
-
-
-
-#[derive(Debug, Deserialize)]
 struct ChallengeRequest {
     request: ChallengeRequestBody
 }
@@ -189,7 +172,6 @@ async fn handle_post(
     info!("Received POST request with the following payload: {:?}", &body);
 
     let request: ChallengeRequest = serde_json::from_value(body).unwrap();
-
     let body = request.request;
 
     let mut uid = "1".to_string();
@@ -221,13 +203,16 @@ async fn handle_post(
     let result = match action.as_str() {
         ACTION_PRESENT => {
             if cache.contains_key(&uid) {
+                info!("Challenge already present in cache");
                 let challenge_id = cache.get(&uid).unwrap().clone();
                 Ok(challenge_id)
             } else {
+                info!("Adding DNS challenge");
                 plesk_api.add_challenge(challenge_id).await
             }
         },
         ACTION_CLEANUP => {
+            info!("Removing DNS challenge");
             let record_id = cache.get(&uid).unwrap().clone();
             plesk_api.remove_challenge(record_id).await
         },
