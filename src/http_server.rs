@@ -231,6 +231,7 @@ async fn handle_post(
     }
 
     response_body.success = true;
+    info!("Response body: {:?}", response_body);
     Ok(warp::reply::json(&ChallengeResponse {
         reponse: response_body,
     }))
