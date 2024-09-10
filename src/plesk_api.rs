@@ -98,14 +98,17 @@ impl PleskAPI {
 
         if let Some(dns_resp_record) = dns_response.dns.add_rec {
             if dns_resp_record.result.status == "error" {
-                let error = io::Error::new(
-                    io::ErrorKind::Other,
-                    format!(
-                        "Plesk API error: {}",
-                        dns_resp_record.result.errtext.unwrap()
-                    ),
-                );
-                return Err(anyhow!(error));
+                let error_msg = dns_resp_record.result.errtext.unwrap();
+                if !error_msg.contains("exists") {
+                    let error = io::Error::new(
+                        io::ErrorKind::Other,
+                        format!(
+                            "Plesk API error: {}",
+                            error_msg
+                        ),
+                    );
+                    return Err(anyhow!(error));
+                }
             }
             let record_id = dns_resp_record.result.id.unwrap();
             return Ok(record_id);
