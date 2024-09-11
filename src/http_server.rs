@@ -47,8 +47,11 @@ struct ChallengeResponse {
 
 #[derive(Debug, Serialize)]
 struct ChallengeResponseBody {
+    #[serde(rename = "uid")]
     uid: String,
+    #[serde(rename = "success")]
     success: bool,
+    #[serde(rename = "status", skip_serializing_if = "Option::is_none")]
     status: Option<ErrorResponse>,
 }
 
@@ -195,6 +198,12 @@ async fn handle_post(
 
     if !cache.contains_key(&uid) && action == ACTION_CLEANUP {
         info!("Record ID not found in cache, returning no success");
+        let error_msg = ErrorResponse {
+            message: "Record ID not found in cache".to_string(),
+            reason: "Record ID not found in cache".to_string(),
+            code: 404,
+        };
+        response_body.status = Some(error_msg);
         return Ok(warp::reply::json(&ChallengeResponse {
             reponse: response_body
         }));
