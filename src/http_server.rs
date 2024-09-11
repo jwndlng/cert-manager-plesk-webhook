@@ -179,12 +179,12 @@ async fn handle_post(
         let body_uid = body.uid.unwrap();
         if &body_uid != "" {
             uid = body_uid;
-            info!("UID {} found in request.", &uid);
+            info!("UID '{}' found in request.", &uid);
         }
     }
 
     let mut response_body = ChallengeResponseBody {
-        uid: uid.clone(),
+        uid: "".to_string(),
         success: false,
         status: None,
     };
