@@ -1,6 +1,5 @@
 use anyhow::{Error, anyhow};
-use warp::filters::body;
-use warp::Filter;
+use warp::{Filter, reply::Response};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -42,7 +41,7 @@ struct ChallengeRequestBody {
 
 #[derive(Debug, Serialize)]
 struct ChallengeResponse {
-    reponse: ChallengeResponseBody
+    response: ChallengeResponseBody
 }
 
 #[derive(Debug, Serialize)]
@@ -165,6 +164,7 @@ impl HttpServer {
     }   
 }
 
+
 // Handler for the /cleanup endpoint
 async fn handle_post(
     body: Value,
@@ -205,7 +205,7 @@ async fn handle_post(
         };
         response_body.status = Some(error_msg);
         return Ok(warp::reply::json(&ChallengeResponse {
-            reponse: response_body
+            response: response_body
         }));
     }
 
@@ -231,7 +231,7 @@ async fn handle_post(
     if result.is_err() {
         info!("Error: {:?}", result.err());
         return Ok(warp::reply::json(&ChallengeResponse {
-            reponse: response_body,
+            response: response_body,
         }));
     }
 
@@ -243,13 +243,13 @@ async fn handle_post(
     response_body.success = true;
     info!("Response body: {:?}", response_body);
     Ok(warp::reply::json(&ChallengeResponse {
-        reponse: response_body,
+        response: response_body,
     }))
 }
 
 async fn handle_get() -> Result<impl warp::Reply, warp::Rejection> {
     Ok(warp::reply::json(&ChallengeResponse {
-        reponse: ChallengeResponseBody {
+        response: ChallengeResponseBody {
             uid: "1".to_string(),
             success: false,
             status: Some(ErrorResponse {
