@@ -1,32 +1,63 @@
-use anyhow::Error;
+use anyhow::{Error, anyhow};
 use warp::Filter;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
 use rcgen::generate_simple_self_signed;
-use tokio::task;
+use tokio::{task, sync::Mutex};
+use serde_json::Value;
 use crate::plesk_api::PleskAPI;
 use crate::settings::Settings;
 
+// Define constants for actions
+const ACTION_PRESENT: &str = "Present";
+const ACTION_CLEANUP: &str = "CleanUp";
 
 #[derive(Debug, Deserialize)]
-struct DnsAddRequest {
-    pub value: String,
+struct ChallengeRequest {
+    request: ChallengeRequestBody
 }
+
 #[derive(Debug, Deserialize)]
-struct DnsRemovalRequest {
-    pub record_id: String,
+struct ChallengeRequestBody {
+    uid: Option<String>,
+    action: String,
+    #[serde(rename = "type")]
+    type_: String,
+    #[serde(rename = "dnsName")]
+    dns_name: String,
+    key: String,
+    #[serde(rename = "resolvedFQDN")]
+    resolved_fqdn: String,
+    #[serde(rename = "resolvedZone")]
+    resolved_zone: String,
+    #[serde(rename = "resourceNamespace")]
+    resource_namespace: String,
+    #[serde(rename = "allowAmbientCredentials")]
+    allow_ambient_credentials: bool,
+    config: Option<Value>,
 }
 
 #[derive(Debug, Serialize)]
-struct DnsResponse {
-    pub status: String,
-    pub record_id: Option<String>,
+struct ChallengeResponse {
+    response: ChallengeResponseBody
 }
 
 #[derive(Debug, Serialize)]
-struct SolverResponse {
-    pub solver: String
+struct ChallengeResponseBody {
+    #[serde(rename = "uid")]
+    uid: String,
+    #[serde(rename = "success")]
+    success: bool,
+    #[serde(rename = "status", skip_serializing_if = "Option::is_none")]
+    status: Option<ErrorResponse>,
+}
+
+#[derive(Debug, Serialize)]
+struct ErrorResponse {
+    message: String,
+    reason: String,
+    code: i32,
 }
 
 pub struct HttpServer {
@@ -35,6 +66,7 @@ pub struct HttpServer {
     solver_name: String,
     solver_version: String,
 }
+
 
 impl HttpServer {
     pub fn new(settings: &Settings) -> Self {
@@ -54,47 +86,39 @@ impl HttpServer {
 
     pub async fn start(&mut self) -> Result<(), Error> {
 
-        let plesk_api_clone_cleanup = self.plesk_api.clone();
+        let cached_record = Arc::new(Mutex::new(Option::<String>::None));
         let plesk_api_clone_present = self.plesk_api.clone();
-        let solver_name = self.solver_name.clone();
 
         // Base path called /apis/<group_name>/<solver_version> by cert-manager
         let url_base_path = warp::path("apis")
             .and(warp::path(self.group_name.clone()))
             .and(warp::path(self.solver_version.clone()));
 
-        let present_route = url_base_path.clone()
-        .and(warp::path("present"))
+        let post_route = url_base_path.clone()
+        .and(warp::path(self.solver_name.clone()))
         .and(warp::post())
         .and(warp::body::json())
         .and_then(move |body| {
             let plesk_api = plesk_api_clone_present.clone();
-            handle_present(body, plesk_api)
+            let cache = cached_record.clone();
+            handle_post(body, plesk_api, cache)
         });
 
-        let cleanup_route = url_base_path.clone()
-            .and(warp::path("cleanup"))
-            .and(warp::post())
-            .and(warp::body::json())
-            .and_then(move |body| {
-                let plesk_api = plesk_api_clone_cleanup.clone();
-                handle_cleanup(body, plesk_api)
-        });
-
-        let solver_route = url_base_path.clone()
+        let get_route = url_base_path.clone()
             .and(warp::get())
-            .and_then(move || {
-                handle_solver(solver_name.clone())
-            });
+            .and_then(handle_get);
+
+        // OpenAPI routes are not implemented yet, but will see if we need them
 
         // Combine the routes
-        let routes = present_route.or(cleanup_route).or(solver_route)
+        let routes = post_route.or(get_route)
             .with(warp::log::custom(|info| {
                 tracing::info!(
-                    "Request: {} {} from {}",
+                    "Request: {} {} from {}. Status: {}",
                     info.method(),
                     info.path(),
-                    info.remote_addr().map(|addr| addr.to_string()).unwrap_or_else(|| "unknown".to_string())
+                    info.remote_addr().map(|addr| addr.to_string()).unwrap_or_else(|| "unknown".to_string()),
+                    info.status().as_u16()
                 );
             }));
 
@@ -139,55 +163,89 @@ impl HttpServer {
     }   
 }
 
-async fn handle_present(body: DnsAddRequest, plesk_api: Arc<PleskAPI>) -> Result<impl warp::Reply, warp::Rejection> {
-    let value = body.value;
-
-    info!("Received /present request for Value: {}", value);
-    
-    let result = plesk_api.add_challenge(value).await;
-
-    // Respond with a success message
-    if result.is_err() {
-        let response = DnsResponse {
-            status: "error".to_string(),
-            record_id: None,
-        };
-        return Ok(warp::reply::json(&response));
-    }
-    let response = DnsResponse {
-        status: "success".to_string(),
-        record_id: result.ok(),
-    };
-    Ok(warp::reply::json(&response))
-}
 
 // Handler for the /cleanup endpoint
-async fn handle_cleanup(body: DnsRemovalRequest, plesk_api: Arc<PleskAPI>) -> Result<impl warp::Reply, warp::Rejection> {
-    // Extract the FQDN and value from the request body
-    let record_id = body.record_id;
+async fn handle_post(
+    body: Value,
+    plesk_api: Arc<PleskAPI>,
+    cache: Arc<Mutex<Option<String>>>
+) -> Result<impl warp::Reply, warp::Rejection> {
+    
+    info!("Received POST request with the following payload: {:?}", &body);
 
-    info!("Received /cleanup request for Record ID: {}", record_id);
-    let result = plesk_api.remove_challenge(record_id).await;
+    let request: ChallengeRequest = serde_json::from_value(body).unwrap();
+    let body = request.request;
+
+    let mut response_body = ChallengeResponseBody {
+        uid: "".to_string(),
+        success: false,
+        status: None,
+    };
+    let challenge_id = body.key;
+    let action = body.action;
+    let mut cached_record = cache.lock().await;
+
+    let result = match action.as_str() {
+        ACTION_PRESENT => {
+            if let Some(cached_record_id) = cached_record.clone() {
+                info!("Challenge already present in cache");
+                Ok(cached_record_id)
+            } else {
+                info!("Adding DNS challenge");
+                let record_id = plesk_api.add_challenge(challenge_id).await.unwrap();
+                let _ = cached_record.insert(record_id.clone());
+                Ok(record_id)
+            }
+        },
+        ACTION_CLEANUP => {
+            if let Some(cached_record_id) = cached_record.take() {
+                info!("Removing DNS challenge");
+                plesk_api.remove_challenge(cached_record_id).await
+            } else {
+                info!("Record ID not found in cache, returning no success");
+                let error_resp = ErrorResponse {
+                    message: "Record ID not found in cache".to_string(),
+                    reason: "Record ID not found in cache".to_string(),
+                    code: 404,
+                };
+                response_body.status = Some(error_resp);
+                return Ok(warp::reply::json(&ChallengeResponse {
+                    response: response_body
+                }));
+            }
+        },
+        _ => { Err(anyhow!("Invalid action")) }
+    };
 
     if result.is_err() {
-        let response = DnsResponse {
-            status: "error".to_string(),
-            record_id: None,
+        let error_msg = result.err().unwrap().to_string();
+        let error_resp = ErrorResponse {
+            message: error_msg.clone(),
+            reason: error_msg,
+            code: 404,
         };
-        return Ok(warp::reply::json(&response));
+        response_body.status = Some(error_resp);
+        return Ok(warp::reply::json(&ChallengeResponse {
+            response: response_body,
+        }));
     }
 
-    // Respond with a success message
-    let response = DnsResponse {
-        status: "success".to_string(),
-        record_id: None,
-    };
-    Ok(warp::reply::json(&response))
+    response_body.success = true;
+    Ok(warp::reply::json(&ChallengeResponse {
+        response: response_body,
+    }))
 }
 
-async fn handle_solver(solver_name: String) -> Result<impl warp::Reply, warp::Rejection> {
-    info!("Received /apis request for Solver: {}", solver_name);
-    Ok(warp::reply::json(&SolverResponse {
-        solver: solver_name,
+async fn handle_get() -> Result<impl warp::Reply, warp::Rejection> {
+    Ok(warp::reply::json(&ChallengeResponse {
+        response: ChallengeResponseBody {
+            uid: "1".to_string(),
+            success: false,
+            status: Some(ErrorResponse {
+                message: "Not implemented".to_string(),
+                reason: "Not implemented".to_string(),
+                code: 501,
+            }),
+        }
     }))
 }
