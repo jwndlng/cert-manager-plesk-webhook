@@ -1,9 +1,8 @@
 use anyhow::{Error, anyhow};
-use warp::{Filter, reply::Response};
+use warp::Filter;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::collections::HashMap;
-use tracing::{info, debug};
+use tracing::info;
 use rcgen::generate_simple_self_signed;
 use tokio::{task, sync::Mutex};
 use serde_json::Value;
@@ -87,7 +86,7 @@ impl HttpServer {
 
     pub async fn start(&mut self) -> Result<(), Error> {
 
-        let request_cache = Arc::new(Mutex::new(HashMap::<String, String>::new()));
+        let cached_record = Arc::new(Mutex::new(Option::<String>::None));
         let plesk_api_clone_present = self.plesk_api.clone();
 
         // Base path called /apis/<group_name>/<solver_version> by cert-manager
@@ -101,7 +100,7 @@ impl HttpServer {
         .and(warp::body::json())
         .and_then(move |body| {
             let plesk_api = plesk_api_clone_present.clone();
-            let cache = request_cache.clone();
+            let cache = cached_record.clone();
             handle_post(body, plesk_api, cache)
         });
 
@@ -169,22 +168,13 @@ impl HttpServer {
 async fn handle_post(
     body: Value,
     plesk_api: Arc<PleskAPI>,
-    cache: Arc<Mutex<HashMap<String, String>>>
+    cache: Arc<Mutex<Option<String>>>
 ) -> Result<impl warp::Reply, warp::Rejection> {
     
     info!("Received POST request with the following payload: {:?}", &body);
 
     let request: ChallengeRequest = serde_json::from_value(body).unwrap();
     let body = request.request;
-
-    let mut uid = "1".to_string();
-    if body.uid.is_some() {
-        let body_uid = body.uid.unwrap();
-        if &body_uid != "" {
-            uid = body_uid;
-            info!("UID '{}' found in request.", &uid);
-        }
-    }
 
     let mut response_body = ChallengeResponseBody {
         uid: "".to_string(),
@@ -193,55 +183,54 @@ async fn handle_post(
     };
     let challenge_id = body.key;
     let action = body.action;
-
-    let mut cache = cache.lock().await;
-
-    if !cache.contains_key(&uid) && action == ACTION_CLEANUP {
-        info!("Record ID not found in cache, returning no success");
-        let error_msg = ErrorResponse {
-            message: "Record ID not found in cache".to_string(),
-            reason: "Record ID not found in cache".to_string(),
-            code: 404,
-        };
-        response_body.status = Some(error_msg);
-        return Ok(warp::reply::json(&ChallengeResponse {
-            response: response_body
-        }));
-    }
+    let mut cached_record = cache.lock().await;
 
     let result = match action.as_str() {
         ACTION_PRESENT => {
-            if cache.contains_key(&uid) {
+            if let Some(cached_record_id) = cached_record.clone() {
                 info!("Challenge already present in cache");
-                let challenge_id = cache.get(&uid).unwrap().clone();
-                Ok(challenge_id)
+                Ok(cached_record_id)
             } else {
                 info!("Adding DNS challenge");
-                plesk_api.add_challenge(challenge_id).await
+                let record_id = plesk_api.add_challenge(challenge_id).await.unwrap();
+                let _ = cached_record.insert(record_id.clone());
+                Ok(record_id)
             }
         },
         ACTION_CLEANUP => {
-            info!("Removing DNS challenge");
-            let record_id = cache.get(&uid).unwrap().clone();
-            plesk_api.remove_challenge(record_id).await
+            if let Some(cached_record_id) = cached_record.take() {
+                info!("Removing DNS challenge");
+                plesk_api.remove_challenge(cached_record_id).await
+            } else {
+                info!("Record ID not found in cache, returning no success");
+                let error_resp = ErrorResponse {
+                    message: "Record ID not found in cache".to_string(),
+                    reason: "Record ID not found in cache".to_string(),
+                    code: 404,
+                };
+                response_body.status = Some(error_resp);
+                return Ok(warp::reply::json(&ChallengeResponse {
+                    response: response_body
+                }));
+            }
         },
         _ => { Err(anyhow!("Invalid action")) }
     };
 
     if result.is_err() {
-        info!("Error: {:?}", result.err());
+        let error_msg = result.err().unwrap().to_string();
+        let error_resp = ErrorResponse {
+            message: error_msg.clone(),
+            reason: error_msg,
+            code: 404,
+        };
+        response_body.status = Some(error_resp);
         return Ok(warp::reply::json(&ChallengeResponse {
             response: response_body,
         }));
     }
 
-    if action == ACTION_CLEANUP {
-        // Remove from cache
-        cache.remove(&uid);
-    }
-
     response_body.success = true;
-    info!("Response body: {:?}", response_body);
     Ok(warp::reply::json(&ChallengeResponse {
         response: response_body,
     }))
