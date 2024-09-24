@@ -27,6 +27,7 @@ env:
 jobs:
   security_scanning:
     if : ${{ github.ref_name == 'main' }}
+    environment: ${{ github.ref_name}}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -39,7 +40,7 @@ jobs:
           push: false
           load: true
           file: Dockerfile
-          tags: ${{ env.APPLICATION_NAME}}:latest
+          tags: ${{ env.APPLICATION_NAME}}:${{ vars.DOCKER_IMAGE_VERSION }}
       - name: Aqua Security Trivy
         uses: aquasecurity/trivy-action@0.24.0
         with:
