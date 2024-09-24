@@ -25,6 +25,26 @@ env:
   DOCKER_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/cert-manager-plesk-webhook
 
 jobs:
+  security_scanning:
+    if : ${{ github.ref_name == 'main' }}
+    environment: ${{ github.ref_name}}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build (but not push) Docker image
+        uses: docker/build-push-action@v3
+        with:
+          push: false
+          load: true
+          file: Dockerfile
+          tags: ${{ env.APPLICATION_NAME}}:${{ vars.DOCKER_IMAGE_VERSION }}
+      - name: Aqua Security Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.APPLICATION_NAME}}:latest
   build_docker_image:
     name: Build docker image
     environment: ${{ github.ref_name}}
@@ -56,9 +76,3 @@ jobs:
           subject-name: ${{ env.DOCKER_IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
-
-      - name: Aqua Security Trivy
-        if: github.ref_name == 'main'
-        uses: aquasecurity/trivy-action@0.24.0
-        with:
-          image-ref: ${{ env.APPLICATION_NAME}}:${{ vars.DOCKER_IMAGE_VERSION }}
