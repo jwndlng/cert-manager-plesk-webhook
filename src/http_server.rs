@@ -40,7 +40,8 @@ struct ChallengeRequestBody {
 
 impl ChallengeRequestBody {
     pub fn get_hostname(&self) -> String {
-        self.resolved_fqdn.replace(self.resolved_zone.as_str(), "")
+        let hostname = self.resolved_fqdn.replace(self.resolved_zone.as_str(), "");
+        hostname.trim_end_matches('.').to_string()
     }
 }
 
