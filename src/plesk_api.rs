@@ -119,7 +119,7 @@ impl PleskAPI {
                 let error_msg = dns_resp_record.result.errtext.unwrap();
                 if error_msg.contains("exists") {
                     info!("Record already exists, retrieving record ID");
-                    let record_id = self.get_challenge_record_id(host).await?;
+                    let record_id = self.get_challenge_record_id(&host).await?;
                     return Ok(record_id);
                 } else {
                     let error = io::Error::new(
