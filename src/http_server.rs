@@ -38,6 +38,12 @@ struct ChallengeRequestBody {
     config: Option<Value>,
 }
 
+impl ChallengeRequestBody {
+    pub fn get_hostname(&self) -> String {
+        self.resolved_fqdn.replace(self.resolved_zone.as_str(), "")
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct ChallengeResponse {
     response: ChallengeResponseBody
@@ -134,7 +140,6 @@ impl HttpServer {
         let priv_key_pem = cert_key.key_pair.serialize_pem();
         let cert_pem = cert_key.cert.pem();
 
-
         // Clone the routes for both HTTP and HTTPS
         let routes_http = routes.clone();
         let routes_https = routes;
@@ -174,13 +179,14 @@ async fn handle_post(
     info!("Received POST request with the following payload: {:?}", &body);
 
     let request: ChallengeRequest = serde_json::from_value(body).unwrap();
-    let body = request.request;
+    let body: ChallengeRequestBody = request.request;
 
     let mut response_body = ChallengeResponseBody {
         uid: "".to_string(),
         success: false,
         status: None,
     };
+    let hostname = body.get_hostname();
     let challenge_id = body.key;
     let action = body.action;
     let mut cached_record = cache.lock().await;
@@ -192,7 +198,7 @@ async fn handle_post(
                 Ok(cached_record_id)
             } else {
                 info!("Adding DNS challenge");
-                let record_id = plesk_api.add_challenge(challenge_id).await.unwrap();
+                let record_id = plesk_api.add_challenge(hostname, challenge_id).await.unwrap();
                 let _ = cached_record.insert(record_id.clone());
                 Ok(record_id)
             }

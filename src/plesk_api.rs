@@ -6,7 +6,6 @@ use tracing::info;
 use serde_xml_rs::from_str;
 
 const PLESK_API_PATH: &str = "/enterprise/control/agent.php";
-const ACME_CHALLENGE_PREFIX: &str = "_acme-challenge";
 
 #[derive(Clone)]
 pub struct PleskAPI {
@@ -82,7 +81,7 @@ impl PleskAPI {
             .header("HTTP_AUTH_PASSWD", self.password.clone())
     }
 
-    pub async fn add_challenge(&self, challenge_string: String) -> Result<String, Error> {
+    pub async fn add_challenge(&self, host: String, challenge_string: String) -> Result<String, Error> {
         let payload = format!(
             r#"
                 <packet>
@@ -97,7 +96,7 @@ impl PleskAPI {
                 </packet>
             "#,
             self.site_id,
-            ACME_CHALLENGE_PREFIX,
+            host,
             challenge_string
         );
         let response = self
@@ -120,7 +119,7 @@ impl PleskAPI {
                 let error_msg = dns_resp_record.result.errtext.unwrap();
                 if error_msg.contains("exists") {
                     info!("Record already exists, retrieving record ID");
-                    let record_id = self.get_challenge_record_id().await?;
+                    let record_id = self.get_challenge_record_id(host).await?;
                     return Ok(record_id);
                 } else {
                     let error = io::Error::new(
@@ -195,7 +194,7 @@ impl PleskAPI {
         Err(anyhow!(error))
     }
 
-    pub async fn get_challenge_record_id(&self) -> Result<String, Error> {
+    pub async fn get_challenge_record_id(&self, host: &String) -> Result<String, Error> {
         info!("Getting challenge record ID");
         let response = self
             .create_request()
@@ -232,7 +231,7 @@ impl PleskAPI {
                     continue;
                 }
                 let record_data = action.data.unwrap();
-                if record_data.host.contains(ACME_CHALLENGE_PREFIX) {
+                if record_data.host.contains(host) && record_data.record_type == "TXT" {
                     info!("Found record ID: {}", action.id.clone().unwrap());
                     return Ok(action.id.unwrap());
                 }
