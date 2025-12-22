@@ -2,6 +2,7 @@ use anyhow::{Error, anyhow};
 use warp::Filter;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::collections::HashMap;
 use tracing::info;
 use rcgen::generate_simple_self_signed;
 use tokio::{task, sync::Mutex};
@@ -93,7 +94,7 @@ impl HttpServer {
 
     pub async fn start(&mut self) -> Result<(), Error> {
 
-        let cached_record = Arc::new(Mutex::new(Option::<String>::None));
+        let cached_records = Arc::new(Mutex::new(HashMap::<String, String>::new()));
         let plesk_api_clone_present = self.plesk_api.clone();
 
         // Base path called /apis/<group_name>/<solver_version> by cert-manager
@@ -107,7 +108,7 @@ impl HttpServer {
         .and(warp::body::json())
         .and_then(move |body| {
             let plesk_api = plesk_api_clone_present.clone();
-            let cache = cached_record.clone();
+            let cache = cached_records.clone();
             handle_post(body, plesk_api, cache)
         });
 
@@ -174,7 +175,7 @@ impl HttpServer {
 async fn handle_post(
     body: Value,
     plesk_api: Arc<PleskAPI>,
-    cache: Arc<Mutex<Option<String>>>
+    cache: Arc<Mutex<HashMap<String, String>>>
 ) -> Result<impl warp::Reply, warp::Rejection> {
     
     info!("Received POST request with the following payload: {:?}", &body);
@@ -190,24 +191,24 @@ async fn handle_post(
     let hostname = body.get_hostname();
     let challenge_id = body.key;
     let action = body.action;
-    let mut cached_record = cache.lock().await;
+    let mut cached_records = cache.lock().await;
 
     let result = match action.as_str() {
         ACTION_PRESENT => {
-            if let Some(cached_record_id) = cached_record.clone() {
+            if let Some(record_id) = cached_records.get(&hostname) {
                 info!("Challenge already present in cache");
-                Ok(cached_record_id)
+                Ok(record_id.clone())
             } else {
                 info!("Adding DNS challenge");
-                let record_id = plesk_api.add_challenge(hostname, challenge_id).await.unwrap();
-                let _ = cached_record.insert(record_id.clone());
+                let record_id = plesk_api.add_challenge(&hostname, &challenge_id).await.unwrap();
+                cached_records.insert(hostname, record_id.clone());
                 Ok(record_id)
             }
         },
         ACTION_CLEANUP => {
-            if let Some(cached_record_id) = cached_record.take() {
+            if let Some(record_id) = cached_records.remove(&hostname) {
                 info!("Removing DNS challenge");
-                plesk_api.remove_challenge(cached_record_id).await
+                plesk_api.remove_challenge(record_id).await
             } else {
                 info!("Record ID not found in cache, returning no success");
                 let error_resp = ErrorResponse {

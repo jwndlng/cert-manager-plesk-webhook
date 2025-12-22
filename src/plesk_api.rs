@@ -81,7 +81,7 @@ impl PleskAPI {
             .header("HTTP_AUTH_PASSWD", self.password.clone())
     }
 
-    pub async fn add_challenge(&self, host: String, challenge_string: String) -> Result<String, Error> {
+    pub async fn add_challenge(&self, host: &String, challenge_string: &String) -> Result<String, Error> {
         let payload = format!(
             r#"
                 <packet>
