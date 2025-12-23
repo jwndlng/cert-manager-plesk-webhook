@@ -33,6 +33,7 @@ jobs:
               echo "PR title does not match conventions"
               exit 1
           fi
+
       - name: Add conventional labels
         uses: action-runner/conventional-labeler@2c9e06155ac5585f82ca9440b3e5edba9e81d433
         with:
