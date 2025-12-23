@@ -1,5 +1,5 @@
 # Start with the Rust base image
-FROM rust:1.80 as builder
+FROM rust:1.92 as builder
 
 # Set the working directory
 WORKDIR /usr/src/cert-manager-plesk-webhook
